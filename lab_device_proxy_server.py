@@ -6,12 +6,9 @@
 
 """Lab device proxy server."""
 
-import argparse
 import BaseHTTPServer
 import datetime
 import httplib
-import os
-import re
 import select
 import shutil
 import signal
@@ -22,7 +19,7 @@ import tempfile
 import time
 
 # Reuse the client's parameter parser and tar/untar functions.
-import lab_common
+from lab_common import *
 
 # try:
 #   # pylint: disable=g-import-not-at-top
@@ -35,7 +32,6 @@ import lab_common
 IDEVICE_PATH = 'IDEVICE_PATH'
 SERVER_PORT = 8084
 
-MAX_READ = 16384
 
 
 def main(args):
@@ -115,7 +111,7 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     except Exception, e:  # pylint: disable=broad-except
       timestamps.append(('err', time.time()))
       args = [str(curr.value) for curr in params]
-      self.log_message('Failed: %s\n%s', ' '.join(args), lab_common.GetStack())
+      self.log_message('Failed: %s\n%s', ' '.join(args), GetStack())
       if on_error is not None:
         self.send_error(on_error, str(e))
     finally:
@@ -141,7 +137,7 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       ValueError: when given an invalid chunk.
     """
     # Parse header
-    header = lab_common.ChunkHeader()
+    header = ChunkHeader()
     header_line = from_stream.readline()
     header.Parse(header_line)
 
@@ -184,7 +180,7 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     if not header.in_ and not header.out_:
       # Typical non-i/o arg
-      curr.value = lab_common.ReadExactly(from_stream, header.len_)
+      curr.value = ReadExactly(from_stream, header.len_)
     elif header.in_:
       # Input file
       if header.out_:
@@ -202,11 +198,11 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
               curr.index, header.in_))
         if not header.is_absent_:
           curr.in_fp = (
-              lab_common.Untar(parent_fn) if header.is_tar_ else
+              Untar(parent_fn) if header.is_tar_ else
               open(in_fn, 'wb'))
         curr.value = in_fn
       if header.is_absent_ or header.is_empty_:
-        lab_common.ReadExactly(from_stream, header.len_)
+        ReadExactly(from_stream, header.len_)
       else:
         bytes_read = 0
         while bytes_read < header.len_:
@@ -215,7 +211,7 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
           curr.in_fp.write(data)
     else:
       # Output file placeholder
-      lab_common.ReadExactly(from_stream, header.len_)
+      ReadExactly(from_stream, header.len_)
       curr.out_dn = to_fs.Mkdir('out%s_' % curr.index)
       out_fn = os.path.normpath(os.path.join(curr.out_dn, header.out_))
       if out_fn != curr.out_dn and not out_fn.startswith(curr.out_dn + '/'):
@@ -224,7 +220,7 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       curr.value = out_fn
 
     # Read end-of-chunk
-    if lab_common.ReadExactly(from_stream, 2) != '\r\n':
+    if ReadExactly(from_stream, 2) != '\r\n':
       raise ValueError('Chunk does not end with crlf')
 
     # Keep reading chunks
@@ -241,7 +237,7 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """
     # Parse the command to verify the basic format and options
     args = [curr.value for curr in params]
-    parser = lab_common.PARSER  # Reuse the client's parser
+    parser = PARSER  # Reuse the client's parser
     try:
       reqs = parser.parse_args(args)
     except:
@@ -253,12 +249,12 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     for index in range(len(params)):
       required = reqs[index]
       provided = params[index]
-      in_required = isinstance(required, lab_common.InputFileParameter)
+      in_required = isinstance(required, InputFileParameter)
       in_provided = (provided.header.in_ is not None)
       if in_required != in_provided:
         raise ValueError('arg[%s]=%s %s input file', index, required,
                          'provides' if in_provided else 'lacks')
-      out_required = isinstance(required, lab_common.OutputFileParameter)
+      out_required = isinstance(required, OutputFileParameter)
       out_provided = (provided.out_dn is not None)
       if out_required != out_provided:
         raise ValueError('arg[%s]=%s %s output file', index, required,
@@ -299,11 +295,11 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       from_stream: stream to read from
       to_stream: stream to write to
     """
-    stdout = lab_common.ChunkedOutputStream(lab_common.ChunkHeader(
+    stdout = ChunkedOutputStream(ChunkHeader(
         '1'), to_stream)
-    stderr = lab_common.ChunkedOutputStream(lab_common.ChunkHeader(
+    stderr = ChunkedOutputStream(ChunkHeader(
         '2'), to_stream)
-    exit_stream = lab_common.ChunkedOutputStream(lab_common.ChunkHeader(
+    exit_stream = ChunkedOutputStream(ChunkHeader(
         'exit'), to_stream)
 
     try:
@@ -360,13 +356,13 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       to_stream: stream to write to
     """
     out_dn = curr.out_dn
-    header = lab_common.ChunkHeader('o%d' % curr.index)
+    header = ChunkHeader('o%d' % curr.index)
     header.out_ = curr.header.out_
     if not curr.header.is_tar_:
       out_fns = os.listdir(out_dn)
       if not out_fns:
         header.is_absent_ = True
-        lab_common.SendChunk(header, None, to_stream)
+        SendChunk(header, None, to_stream)
         return
       # We created this out_dn path via Mkdir, so it's valid.
       fn = (os.path.join(out_dn, out_fns[0]) if len(out_fns) == 1 else None)
@@ -374,14 +370,14 @@ class LabDeviceProxyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         with open(fn, 'rb') as fp:
           data = fp.read(MAX_READ)
           if not data:
-            lab_common.SendChunk(header, None, to_stream)
+            SendChunk(header, None, to_stream)
           else:
             while data:
-              lab_common.SendChunk(header, data, to_stream)
+              SendChunk(header, data, to_stream)
               data = fp.read(MAX_READ)
         return
     header.is_tar_ = True
-    lab_common.SendTar(out_dn, '/', header, to_stream)
+    SendTar(out_dn, '/', header, to_stream)
 
   @classmethod
   def _WriteChunks(cls, params, to_stream):

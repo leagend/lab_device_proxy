@@ -1,10 +1,199 @@
+import argparse
 import os
 import re
 import tarfile
 import threading
 import traceback
 
-from lab_device_proxy_client import _CreateParser, MAX_READ
+
+def _CreateParser():
+    """Creates our parameter parser, which accepts a restricted set of commands.
+
+    Returns:
+       A new ParameterParser.
+    """
+
+    idevice_app_runner = ParameterParser(
+        'idevice-app-runner',
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('-D', type=str, nargs='*', action=DAction),
+        ParameterDecl('-s', '--start', type=str),
+        ParameterDecl('--args', type=str, nargs=argparse.REMAINDER))
+
+    idevice_id = ParameterParser(
+        'idevice_id',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-l', '--list', action='store_true'))
+
+    idevice_date = ParameterParser(
+        'idevicedate',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
+
+    idevice_diagnostics = ParameterParser(
+        'idevicediagnostics',
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('command', type=str, choices=['diagnostics']),
+        ParameterDecl('option', type=str, choices=['All', 'WiFi']))
+
+    idevice_image_mounter = ParameterParser(
+        'ideviceimagemounter',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-l', '--list', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('image', type=InputFileParameter),
+        ParameterDecl('signature', type=InputFileParameter))
+
+    idevice_info = ParameterParser(
+        'ideviceinfo',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-k', '--key', type=str),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('-q', '--domain', type=str),
+        ParameterDecl('-s', '--simple', action='store_true'),
+        ParameterDecl('-x', '--xml', action='store_true'))
+
+    idevice_installer = ParameterParser(
+        'ideviceinstaller',
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-i', '--install', type=InputFileParameter),
+        ParameterDecl('-l', '--list', '--list-apps', action='store_true'),
+        ParameterDecl('-o', '--options', type=str),
+        ParameterDecl('-U', '--uninstall', type=str))
+
+    idevicefs_ls = ParameterParser(
+        'ls',
+        ParameterDecl('-F', action='store_true'),
+        ParameterDecl('-R', action='store_true'),
+        ParameterDecl('-l', action='store_true'),
+        ParameterDecl('remote', type=str, nargs=argparse.OPTIONAL))
+
+    idevicefs_pull = ParameterParser(
+        'pull',
+        ParameterDecl('remote', type=str),
+        ParameterDecl('local', type=OutputFileParameter))
+
+    idevicefs_push = ParameterParser(
+        'push',
+        ParameterDecl('local', type=InputFileParameter),
+        ParameterDecl('remote', type=str, nargs=argparse.OPTIONAL))
+
+    idevicefs_rm = ParameterParser(
+        'rm',
+        ParameterDecl('-d', action='store_true'),
+        ParameterDecl('-f', action='store_true'),
+        ParameterDecl('-R', action='store_true'),
+        ParameterDecl('remote', type=str))
+
+    idevicefs_parsers = [
+        ParameterParser('help'),
+        idevicefs_ls,
+        idevicefs_pull, idevicefs_push, idevicefs_rm]
+
+    idevice_fs = ParameterParser(
+        'idevicefs',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
+    idevice_fs.AddSubparsers(*idevicefs_parsers)
+
+    idevice_screenshot = ParameterParser(
+        'idevicescreenshot',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('local', type=OutputFileParameter))
+
+    idevice_syslog = ParameterParser(
+        'idevicesyslog',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
+
+    idevice_parser = [
+        idevice_app_runner, idevice_date, idevice_diagnostics, idevice_fs,
+        idevice_id, idevice_image_mounter, idevice_info, idevice_installer,
+        idevice_screenshot, idevice_syslog]
+
+    adb_connect = ParameterParser(
+        'connect',
+        ParameterDecl('host', type=str))
+
+    adb_devices = ParameterParser(
+        'devices',
+        ParameterDecl('-l', action='store_true'))
+
+    adb_install = ParameterParser(
+        'install',
+        ParameterDecl('-r', action='store_true'),
+        ParameterDecl('-s', action='store_true'),
+        ParameterDecl('file', type=InputFileParameter))
+
+    adb_logcat = ParameterParser(
+        'logcat',
+        ParameterDecl('-B', action='store_true'),
+        ParameterDecl('-b', type=str),
+        ParameterDecl('-c', action='store_true'),
+        ParameterDecl('-d', action='store_true'),
+        ParameterDecl('-f', type=str),
+        ParameterDecl('-g', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-n', type=int),
+        ParameterDecl('-r', type=int),
+        ParameterDecl('-s', action='store_true'),
+        ParameterDecl('-t', type=int),
+        ParameterDecl('-v', type=str),
+        ParameterDecl('filterspecs', nargs=argparse.REMAINDER))
+
+    adb_pull = ParameterParser(
+        'pull',
+        ParameterDecl('remote', type=str),
+        ParameterDecl('local', type=OutputFileParameter))
+
+    adb_push = ParameterParser(
+        'push',
+        ParameterDecl('local', type=InputFileParameter),
+        ParameterDecl('remote', type=str))
+
+    adb_root = ParameterParser(
+        'root')
+
+    adb_shell = ParameterParser(
+        'shell',
+        ParameterDecl('arg0', type=str),  # Must have at least one arg
+        ParameterDecl('args', nargs=argparse.REMAINDER))
+
+    adb_uninstall = ParameterParser(
+        'uninstall',
+        ParameterDecl('-k', action='store_true'),
+        ParameterDecl('package', type=str))
+
+    adb_waitfordevices = ParameterParser(
+        'wait-for-device')
+
+    adb_parsers = [
+        ParameterParser('help'),
+        adb_connect, adb_devices, adb_install, adb_logcat, adb_pull,
+        adb_push, adb_root, adb_shell, adb_uninstall, adb_waitfordevices]
+
+    adb_parser = ParameterParser(
+        'adb',
+        ParameterDecl('-s', type=AndroidSerialParameter))
+    adb_parser.AddSubparsers(*adb_parsers)
+
+    parser = ParameterParser(None)
+    parser.AddSubparsers(adb_parser, *idevice_parser)
+
+    return parser
+
 
 PARSER = _CreateParser()
 
@@ -253,3 +442,210 @@ def Untar(to_fn):
     ret = UntarPipe()
     UntarThread(ret, to_fn).start()
     return ret
+
+
+MAX_READ = 8192
+
+
+class Parameter(object):
+    """A command-line parameter."""
+
+    def __init__(self, value):
+        self.value = value
+        # The argparser supports our custom parameters via "type=CLASSNAME", but it
+        # only passes the value to the constructor.  So, our namespace sets the
+        # "chunk_id" index after our constructor.
+        self.index = None
+
+    def SendTo(self, to_stream):
+        """Sends this parameter as chunked input to the server.
+
+        Args:
+          to_stream: A socket.socket or a file object (e.g. StringIO buffer).
+        """
+        header = ChunkHeader('a%d' % self.index)
+        SendChunk(header, str(self.value), to_stream)
+
+    def __repr__(self):
+        return str(self.value)
+
+
+class AndroidSerialParameter(Parameter):
+    """An Android Device ID."""
+
+    def __init__(self, serial):
+        super(AndroidSerialParameter, self).__init__(serial)
+        if not re.match(r'\S+$', serial):
+            raise ValueError('Invalid Android device id: %s' % serial)
+
+    def __repr__(self):
+        return '{serial}%s' % str(self.value)
+
+
+class IOSDeviceIdParameter(Parameter):
+    """An iOS Device ID."""
+
+    def __init__(self, udid):
+        super(IOSDeviceIdParameter, self).__init__(udid)
+        if not re.match(r'[0-9a-f]{40}$', udid):
+            raise ValueError('Invalid iOS device id: %s' % udid)
+
+    def __repr__(self):
+        return '{udid}%s' % str(self.value)
+
+
+class InputFileParameter(Parameter):
+    """An input file to upload to the server.
+
+    The filename value is "input" relative to the remote server command, e.g.
+    "adb install INPUT_APK".
+    """
+
+    def SendTo(self, to_stream):
+        """Sends a chunked input file to the server.
+
+        Args:
+          to_stream: A socket.socket or a file object (e.g. StringIO buffer).
+        """
+        in_fn = self.value
+        header = ChunkHeader('i%d' % self.index)
+        header.in_ = os.path.basename(in_fn)
+        if os.path.isfile(in_fn):
+            # We could send this as a tar, as noted below.
+            #   Pros: simplified code, preserves file attributes, compressed.
+            #   Cons: server must support tars, added tar header/block data.
+            with open(in_fn, 'r') as file_object:
+                data = file_object.read(MAX_READ)
+                if not data:
+                    SendChunk(header, None, to_stream)
+                else:
+                    while data:
+                        SendChunk(header, data, to_stream)
+                        data = file_object.read(MAX_READ)
+        elif os.path.exists(in_fn):
+            header.is_tar_ = True
+            SendTar(in_fn, os.path.basename(in_fn) + '/', header, to_stream)
+        else:
+            header.is_absent_ = True
+            SendChunk(header, None, to_stream)
+
+    def __repr__(self):
+        return '{input_file}%s' % self.value
+
+
+class OutputFileParameter(Parameter):
+    """An output file that will be sent back from the server.
+
+    The filename value is "output" relative to the remote server command, e.g.
+    "adb pull foo OUTPUT_PATH".
+    """
+
+    def SendTo(self, to_stream):
+        """Sends a chunked output-file placeholder to the server.
+
+        Args:
+          to_stream: A socket.socket or a file object (e.g. StringIO buffer).
+        """
+        out_fn = self.value
+        header = ChunkHeader('o%d' % self.index)
+        if os.path.isdir(out_fn):
+            header.is_tar_ = True
+            header.out_ = '.'
+        else:
+            # As noted in _SendInputFile, we could set is_tar_ here to force the
+            # server to return a tar.  The same pros/cons apply.
+            if not os.path.exists(out_fn):
+                header.is_absent_ = True
+            header.out_ = os.path.basename(out_fn)
+        SendChunk(header, None, to_stream)
+
+    def __repr__(self):
+        return '{output_file}%s' % self.value
+
+
+class ParameterNamespace(argparse.Namespace):
+    """A modified argparse namespace that saves the parameter order."""
+
+    def __init__(self, params=None):
+        super(ParameterNamespace, self).__init__()
+        self.params = (params if params is not None else [])
+
+    def _Append(self, value):
+        param = (value if isinstance(value, Parameter) else Parameter(value))
+        param.index = len(self.params)
+        self.params.append(param)
+
+    def __setattr__(self, name, value):
+        super(ParameterNamespace, self).__setattr__(name, value)
+        if name and name[0] == '_':
+            # Restore _l/__list back to -l/--list
+            name = '-%s%s' % ('-' if name[1] == '_' else name[1], name[2:])
+            self._Append(name)
+        if isinstance(value, list):
+            for v in value:
+                self._Append(v)
+        elif value and value is not True:
+            self._Append(value)
+
+
+class ParameterDecl(object):
+    """A ParameterParser.AddParameter value."""
+
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+
+class ParameterParser(object):
+    """An argparse wrapper that saves the parameter order."""
+
+    def __init__(self, prog, *decls, **kwargs):
+        m = kwargs
+        if 'add_help' not in m:
+            m['add_help'] = False
+        self.p = argparse.ArgumentParser(prog=prog, **m)
+        for decl in decls:
+            self.AddParameter(*decl.args, **decl.kwargs)
+
+    def AddSubparsers(self, *args):
+        def GetParser(**kwargs):
+            return kwargs['parser']
+
+        sp = self.p.add_subparsers(parser_class=GetParser, dest='command')
+        for parser in args:
+            sp.add_parser(parser.p.prog, parser=parser.p)
+        return self
+
+    def AddParameter(self, *args, **kwargs):
+        """Adds a parameter and returns self."""
+        m = kwargs
+        if 'default' not in m:
+            m['default'] = argparse.SUPPRESS
+        if 'dest' in m:
+            self.p.add_argument(*args, **m)
+        else:
+            for arg in args:
+                if 'dest' in m:
+                    del m['dest']
+                if arg[0] == '-':
+                    # Rename -l/--list to _l/__list, to preserve the '-/--' prefix
+                    m['dest'] = '_%s%s' % ('_' if arg[1] == '-' else arg[1], arg[2:])
+                self.p.add_argument(arg, **m)
+        return self
+
+    def parse_args(self, args, namespace=None):  # pylint: disable=g-bad-name
+        ret = []
+        if namespace is None:
+            namespace = ParameterNamespace(ret)
+        try:
+            self.p.parse_args(args, namespace)
+        except:
+            raise ValueError
+        return ret
+
+
+class DAction(argparse.Action):
+    """An argparse action that concatenates "-D" "x=y" to "-Dx=y"."""
+
+    def __call__(self, parser, namespace, value, name):
+        setattr(namespace, self.dest + value[0], True)
