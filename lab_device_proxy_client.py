@@ -79,21 +79,24 @@ def main(args):
             server_lists = []
             for server in servers['android']:
                 params = PARSER.parse_args(['adb', 'devices'])
-                print("Devices on {0}:".format(server))
+                print("Android Devices on {0}:".format(server))
                 if not call_proxy_client('http://{0}:8084'.format(server), params):
                     server_lists.append(server)
             for server in servers['ios']:
                 params = PARSER.parse_args(['idevice_id', '-l'])
-                print("Devices on {0}:".format(server))
+                print("IOS Devices on {0}:".format(server))
                 if not call_proxy_client('http://{0}:8084'.format(server), params):
                     server_lists.append(server)
                     print("\n")
             if len(server_lists) > 1:
                 while True:
-                    server_input = raw_input("Please select the server IP from {0} which the dedicated device is connected to.\nServer IP: ".format(server_lists)).strip()
+                    server_input = raw_input(
+                        "Please input the HOST IP you are going to execute the command line from the following list: "
+                        "\n{0}\n>>> HOST IP: ".format("\n".join(server_lists))).strip()
                     if server_input in server_lists:
                         url = 'http://{0}:8084'.format(server_input)
                         break
+                    print("\n\nThe IP you input did not match one of the list above. Please try again!\n")
             elif len(server_lists) == 1:
                 url = 'http://{0}:8084'.format(server_lists[0])
             else:
