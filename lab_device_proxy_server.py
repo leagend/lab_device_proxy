@@ -22,18 +22,20 @@ import tempfile
 import time
 
 # Reuse the client's parameter parser and tar/untar functions.
-try:
-  # pylint: disable=g-import-not-at-top
-  # pylint: disable=g-import-not-at-top
-  from lab_device_proxy import lab_device_proxy_client as lab_common
-except ImportError:
-  # pylint: disable=g-import-not-at-top
-  import lab_device_proxy_client as lab_common
+import lab_common
+
+# try:
+#   # pylint: disable=g-import-not-at-top
+#   # pylint: disable=g-import-not-at-top
+#   from lab_device_proxy import lab_device_proxy_client as lab_common
+# except ImportError:
+#   # pylint: disable=g-import-not-at-top
+#   import lab_device_proxy_client as lab_common
 
 IDEVICE_PATH = 'IDEVICE_PATH'
 SERVER_PORT = 8084
 
-MAX_READ = 8192
+MAX_READ = 16384
 
 
 def main(args):
