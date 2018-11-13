@@ -6,196 +6,7 @@ import threading
 import traceback
 
 
-def _CreateParser():
-    """Creates our parameter parser, which accepts a restricted set of commands.
 
-    Returns:
-       A new ParameterParser.
-    """
-
-    idevice_app_runner = ParameterParser(
-        'idevice-app-runner',
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
-        ParameterDecl('-D', type=str, nargs='*', action=DAction),
-        ParameterDecl('-s', '--start', type=str),
-        ParameterDecl('--args', type=str, nargs=argparse.REMAINDER))
-
-    idevice_id = ParameterParser(
-        'idevice_id',
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-l', '--list', action='store_true'))
-
-    idevice_date = ParameterParser(
-        'idevicedate',
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
-
-    idevice_diagnostics = ParameterParser(
-        'idevicediagnostics',
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
-        ParameterDecl('command', type=str, choices=['diagnostics']),
-        ParameterDecl('option', type=str, choices=['All', 'WiFi']))
-
-    idevice_image_mounter = ParameterParser(
-        'ideviceimagemounter',
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-l', '--list', action='store_true'),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
-        ParameterDecl('image', type=InputFileParameter),
-        ParameterDecl('signature', type=InputFileParameter))
-
-    idevice_info = ParameterParser(
-        'ideviceinfo',
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-k', '--key', type=str),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
-        ParameterDecl('-q', '--domain', type=str),
-        ParameterDecl('-s', '--simple', action='store_true'),
-        ParameterDecl('-x', '--xml', action='store_true'))
-
-    idevice_installer = ParameterParser(
-        'ideviceinstaller',
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-i', '--install', type=InputFileParameter),
-        ParameterDecl('-l', '--list', '--list-apps', action='store_true'),
-        ParameterDecl('-o', '--options', type=str),
-        ParameterDecl('-U', '--uninstall', type=str))
-
-    idevicefs_ls = ParameterParser(
-        'ls',
-        ParameterDecl('-F', action='store_true'),
-        ParameterDecl('-R', action='store_true'),
-        ParameterDecl('-l', action='store_true'),
-        ParameterDecl('remote', type=str, nargs=argparse.OPTIONAL))
-
-    idevicefs_pull = ParameterParser(
-        'pull',
-        ParameterDecl('remote', type=str),
-        ParameterDecl('local', type=OutputFileParameter))
-
-    idevicefs_push = ParameterParser(
-        'push',
-        ParameterDecl('local', type=InputFileParameter),
-        ParameterDecl('remote', type=str, nargs=argparse.OPTIONAL))
-
-    idevicefs_rm = ParameterParser(
-        'rm',
-        ParameterDecl('-d', action='store_true'),
-        ParameterDecl('-f', action='store_true'),
-        ParameterDecl('-R', action='store_true'),
-        ParameterDecl('remote', type=str))
-
-    idevicefs_parsers = [
-        ParameterParser('help'),
-        idevicefs_ls,
-        idevicefs_pull, idevicefs_push, idevicefs_rm]
-
-    idevice_fs = ParameterParser(
-        'idevicefs',
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
-    idevice_fs.AddSubparsers(*idevicefs_parsers)
-
-    idevice_screenshot = ParameterParser(
-        'idevicescreenshot',
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
-        ParameterDecl('local', type=OutputFileParameter))
-
-    idevice_syslog = ParameterParser(
-        'idevicesyslog',
-        ParameterDecl('-d', '--debug', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
-
-    idevice_parser = [
-        idevice_app_runner, idevice_date, idevice_diagnostics, idevice_fs,
-        idevice_id, idevice_image_mounter, idevice_info, idevice_installer,
-        idevice_screenshot, idevice_syslog]
-
-    adb_connect = ParameterParser(
-        'connect',
-        ParameterDecl('host', type=str))
-
-    adb_devices = ParameterParser(
-        'devices',
-        ParameterDecl('-l', action='store_true'))
-
-    adb_install = ParameterParser(
-        'install',
-        ParameterDecl('-r', action='store_true'),
-        ParameterDecl('-s', action='store_true'),
-        ParameterDecl('file', type=InputFileParameter))
-
-    adb_logcat = ParameterParser(
-        'logcat',
-        ParameterDecl('-B', action='store_true'),
-        ParameterDecl('-b', type=str),
-        ParameterDecl('-c', action='store_true'),
-        ParameterDecl('-d', action='store_true'),
-        ParameterDecl('-f', type=str),
-        ParameterDecl('-g', action='store_true'),
-        ParameterDecl('-h', '--help', action='store_true'),
-        ParameterDecl('-n', type=int),
-        ParameterDecl('-r', type=int),
-        ParameterDecl('-s', action='store_true'),
-        ParameterDecl('-t', type=int),
-        ParameterDecl('-v', type=str),
-        ParameterDecl('filterspecs', nargs=argparse.REMAINDER))
-
-    adb_pull = ParameterParser(
-        'pull',
-        ParameterDecl('remote', type=str),
-        ParameterDecl('local', type=OutputFileParameter))
-
-    adb_push = ParameterParser(
-        'push',
-        ParameterDecl('local', type=InputFileParameter),
-        ParameterDecl('remote', type=str))
-
-    adb_root = ParameterParser(
-        'root')
-
-    adb_shell = ParameterParser(
-        'shell',
-        ParameterDecl('arg0', type=str),  # Must have at least one arg
-        ParameterDecl('args', nargs=argparse.REMAINDER))
-
-    adb_uninstall = ParameterParser(
-        'uninstall',
-        ParameterDecl('-k', action='store_true'),
-        ParameterDecl('package', type=str))
-
-    adb_waitfordevices = ParameterParser(
-        'wait-for-device')
-
-    adb_parsers = [
-        ParameterParser('help'),
-        adb_connect, adb_devices, adb_install, adb_logcat, adb_pull,
-        adb_push, adb_root, adb_shell, adb_uninstall, adb_waitfordevices]
-
-    adb_parser = ParameterParser(
-        'adb',
-        ParameterDecl('-s', type=AndroidSerialParameter))
-    adb_parser.AddSubparsers(*adb_parsers)
-
-    parser = ParameterParser(None)
-    parser.AddSubparsers(adb_parser, *idevice_parser)
-
-    return parser
-
-
-PARSER = _CreateParser()
 
 
 class ChunkHeader(object):
@@ -649,3 +460,196 @@ class DAction(argparse.Action):
 
     def __call__(self, parser, namespace, value, name):
         setattr(namespace, self.dest + value[0], True)
+
+
+def _CreateParser():
+    """Creates our parameter parser, which accepts a restricted set of commands.
+
+    Returns:
+       A new ParameterParser.
+    """
+
+    idevice_app_runner = ParameterParser(
+        'idevice-app-runner',
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('-D', type=str, nargs='*', action=DAction),
+        ParameterDecl('-s', '--start', type=str),
+        ParameterDecl('--args', type=str, nargs=argparse.REMAINDER))
+
+    idevice_id = ParameterParser(
+        'idevice_id',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-l', '--list', action='store_true'))
+
+    idevice_date = ParameterParser(
+        'idevicedate',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
+
+    idevice_diagnostics = ParameterParser(
+        'idevicediagnostics',
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('command', type=str, choices=['diagnostics']),
+        ParameterDecl('option', type=str, choices=['All', 'WiFi']))
+
+    idevice_image_mounter = ParameterParser(
+        'ideviceimagemounter',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-l', '--list', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('image', type=InputFileParameter),
+        ParameterDecl('signature', type=InputFileParameter))
+
+    idevice_info = ParameterParser(
+        'ideviceinfo',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-k', '--key', type=str),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('-q', '--domain', type=str),
+        ParameterDecl('-s', '--simple', action='store_true'),
+        ParameterDecl('-x', '--xml', action='store_true'))
+
+    idevice_installer = ParameterParser(
+        'ideviceinstaller',
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-i', '--install', type=InputFileParameter),
+        ParameterDecl('-l', '--list', '--list-apps', action='store_true'),
+        ParameterDecl('-o', '--options', type=str),
+        ParameterDecl('-U', '--uninstall', type=str))
+
+    idevicefs_ls = ParameterParser(
+        'ls',
+        ParameterDecl('-F', action='store_true'),
+        ParameterDecl('-R', action='store_true'),
+        ParameterDecl('-l', action='store_true'),
+        ParameterDecl('remote', type=str, nargs=argparse.OPTIONAL))
+
+    idevicefs_pull = ParameterParser(
+        'pull',
+        ParameterDecl('remote', type=str),
+        ParameterDecl('local', type=OutputFileParameter))
+
+    idevicefs_push = ParameterParser(
+        'push',
+        ParameterDecl('local', type=InputFileParameter),
+        ParameterDecl('remote', type=str, nargs=argparse.OPTIONAL))
+
+    idevicefs_rm = ParameterParser(
+        'rm',
+        ParameterDecl('-d', action='store_true'),
+        ParameterDecl('-f', action='store_true'),
+        ParameterDecl('-R', action='store_true'),
+        ParameterDecl('remote', type=str))
+
+    idevicefs_parsers = [
+        ParameterParser('help'),
+        idevicefs_ls,
+        idevicefs_pull, idevicefs_push, idevicefs_rm]
+
+    idevice_fs = ParameterParser(
+        'idevicefs',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
+    idevice_fs.AddSubparsers(*idevicefs_parsers)
+
+    idevice_screenshot = ParameterParser(
+        'idevicescreenshot',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter),
+        ParameterDecl('local', type=OutputFileParameter))
+
+    idevice_syslog = ParameterParser(
+        'idevicesyslog',
+        ParameterDecl('-d', '--debug', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-u', '--uuid', type=IOSDeviceIdParameter))
+
+    idevice_parser = [
+        idevice_app_runner, idevice_date, idevice_diagnostics, idevice_fs,
+        idevice_id, idevice_image_mounter, idevice_info, idevice_installer,
+        idevice_screenshot, idevice_syslog]
+
+    adb_connect = ParameterParser(
+        'connect',
+        ParameterDecl('host', type=str))
+
+    adb_devices = ParameterParser(
+        'devices',
+        ParameterDecl('-l', action='store_true'))
+
+    adb_install = ParameterParser(
+        'install',
+        ParameterDecl('-r', action='store_true'),
+        ParameterDecl('-s', action='store_true'),
+        ParameterDecl('file', type=InputFileParameter))
+
+    adb_logcat = ParameterParser(
+        'logcat',
+        ParameterDecl('-B', action='store_true'),
+        ParameterDecl('-b', type=str),
+        ParameterDecl('-c', action='store_true'),
+        ParameterDecl('-d', action='store_true'),
+        ParameterDecl('-f', type=str),
+        ParameterDecl('-g', action='store_true'),
+        ParameterDecl('-h', '--help', action='store_true'),
+        ParameterDecl('-n', type=int),
+        ParameterDecl('-r', type=int),
+        ParameterDecl('-s', action='store_true'),
+        ParameterDecl('-t', type=int),
+        ParameterDecl('-v', type=str),
+        ParameterDecl('filterspecs', nargs=argparse.REMAINDER))
+
+    adb_pull = ParameterParser(
+        'pull',
+        ParameterDecl('remote', type=str),
+        ParameterDecl('local', type=OutputFileParameter))
+
+    adb_push = ParameterParser(
+        'push',
+        ParameterDecl('local', type=InputFileParameter),
+        ParameterDecl('remote', type=str))
+
+    adb_root = ParameterParser(
+        'root')
+
+    adb_shell = ParameterParser(
+        'shell',
+        ParameterDecl('arg0', type=str),  # Must have at least one arg
+        ParameterDecl('args', nargs=argparse.REMAINDER))
+
+    adb_uninstall = ParameterParser(
+        'uninstall',
+        ParameterDecl('-k', action='store_true'),
+        ParameterDecl('package', type=str))
+
+    adb_waitfordevices = ParameterParser(
+        'wait-for-device')
+
+    adb_parsers = [
+        ParameterParser('help'),
+        adb_connect, adb_devices, adb_install, adb_logcat, adb_pull,
+        adb_push, adb_root, adb_shell, adb_uninstall, adb_waitfordevices]
+
+    adb_parser = ParameterParser(
+        'adb',
+        ParameterDecl('-s', type=AndroidSerialParameter))
+    adb_parser.AddSubparsers(*adb_parsers)
+
+    parser = ParameterParser(None)
+    parser.AddSubparsers(adb_parser, *idevice_parser)
+
+    return parser
+
+
+PARSER = _CreateParser()
+
