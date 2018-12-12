@@ -103,10 +103,10 @@ def main(args):
                 sys.exit('No valid device server found!')
             if platform.system() == 'Windows':
                 os.system('echo set {0}={1} > set_url.bat'.format(LAB_DEVICE_PROXY_URL, url))
-                print("To avoid select IP, you're suggested to run \"set_url.bat\"un before next execution!")
+                print("To avoid select IP, you're suggested to run \"set_url.bat\" before next execution!")
             else:
                 os.system('echo export {0}={1} > set_url.sh'.format(LAB_DEVICE_PROXY_URL, url))
-                print("To avoid select IP, you're suggested to run \"source set_url.bat\" before next execution!")
+                print("To avoid select IP, you're suggested to run \"source set_url.sh\" before next execution!")
             print("\n")
         else:
             sys.exit(
